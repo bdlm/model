@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
-echo "" > coverage.txt
+
+go get -u github.com/golang/dep/cmd/dep
+dep ensure
 
 rm -f coverage.txt
 for dir in $(go list ./...); do
