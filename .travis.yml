@@ -11,6 +11,8 @@ branches:
     only:
         - master
 
+install: true
+
 language: go
 go_import_path: github.com/bdlm/model
 go:
