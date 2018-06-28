@@ -1,0 +1,24 @@
+notifications:
+    slack:
+        secure: UsakL9icEnK1C0Rrh2eJ1B/DIZOTElSkUQgGDP0v3EyLUixEsk5xToIaH5lWgRYhWAV3ISSKCc+2VCNqPcU5xa8J37w96eiVhi3l6coLiIEzRiCwI2BD4lx9xUijNQZR+1ZaS3T2x5DhhT6AkHB2FF36VKnJdUDyjcN3q/t8qOX+fx3tnJwV91VwPiNSVfgCIKvX9HE+SOb6i0MoIliVCynJwB9B6DEY2ATYr3ca6OvWOaI2VCHW6Ddh4c35B+M0Z4PrrDAuvGZ76YoSdwO1+KK4C5Lb3I9VSJzAgWfXO5Hsv8Kxwpg//am6qY2MvU8DR2yy3HtMGFK4DDejW86rzOv93VF/u9Wr8Ch+hkypd0A+SNlpZb143j52akgqTjlzkTmwa+MkGo0akb6Ap4aTxyu/mS09HeTp/ngRhFz/x+LlO9fY7HgR/vzPLTwvJ2esatfBqnuAgpT/grF1pi9nyVGNAspN34QdStdo2949eCxzf2oyG+mmd8cYt5zrI7OSB3ndPQug9/G+niWdkMr4nC33wgCvPHSezKZLaDt4pxYKUM9kom//bBdnzGjt6cI7XOTJ8KWEP6jdIiUHDAG+Y/HHevNubFecJsfMcq99z5uwvoXJlEXiC+PXFUQg8lgw+qrjX7w9VOgohkQ/UpP3onG35Wv5UT5ddJf+gsUdvfc=
+
+language: go
+go_import_path: github.com/bdlm/model
+go:
+    - 1.5.x
+    - 1.6.x
+    - 1.7.x
+    - 1.8.x
+    - 1.9.x
+    - 1.10.x
+    #- tip
+
+before_script:
+    - go get -u github.com/golang/dep/cmd/dep
+    - dep ensure
+
+script:
+    - sh .travis.sh
+
+after_success:
+    - bash <(curl -s https://codecov.io/bash)
