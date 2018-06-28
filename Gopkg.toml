@@ -1,3 +1,7 @@
 [[constraint]]
   name = "github.com/spf13/cast"
   version = "1.2.0"
+
+[[constraint]]
+  branch = "modeling"
+  name = "github.com/bdlm/std"

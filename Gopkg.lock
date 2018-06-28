@@ -14,10 +14,10 @@
   revision = "061d503afb4df639d1997252d3dc97a01fbb8c85"
 
 [[projects]]
-  branch = "master"
+  branch = "modeling"
   name = "github.com/bdlm/std"
   packages = ["."]
-  revision = "bd1d3561339e0b9b38b46fa9688eb91bfdb7a30f"
+  revision = "0fa7c27508bfb35e6d6e4cf3fe45991ff5ff011e"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -49,6 +49,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a50e0af08d2e7335f90df2b2ac3c20b5472ade565682adaa2e66bc2cd85ffd68"
+  inputs-digest = "5e5c4457307c961943265d5ed31377c1566d2c263f936bdc017bca4cb7ff9400"
   solver-name = "gps-cdcl"
   solver-version = 1
