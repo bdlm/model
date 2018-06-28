@@ -3,6 +3,9 @@ set -e
 
 go get -u github.com/golang/dep/cmd/dep
 dep ensure
+cd vendor/github.com/bdlm/std
+git --no-pager log
+cd -
 
 rm -f coverage.txt
 for dir in $(go list ./...); do
