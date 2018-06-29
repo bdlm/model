@@ -16,13 +16,10 @@ install: true
 language: go
 go_import_path: github.com/bdlm/model
 go:
-    - 1.5.x
-    - 1.6.x
-    - 1.7.x
     - 1.8.x
     - 1.9.x
     - 1.10.x
-    #- tip
+    - tip
 
 script:
     - sh .travis.sh
