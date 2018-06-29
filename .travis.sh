@@ -5,7 +5,7 @@ go get -u github.com/golang/dep/cmd/dep
 dep ensure
 
 rm -f coverage.txt
-for dir in $(go list ./...); do
+for dir in $(go list ./... | grep -v vendor); do
     echo "go test -timeout 20s -coverprofile=profile.out $dir"
     go test -timeout 20s -coverprofile=profile.out $dir
     exit_code=$?
