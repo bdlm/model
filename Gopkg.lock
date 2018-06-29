@@ -5,7 +5,7 @@
   branch = "master"
   name = "github.com/bdlm/errors"
   packages = ["."]
-  revision = "f5917b8d6d7c82c07437f912106cf188dfcb62c0"
+  revision = "4261cfedec68315454b163ae305cd34ecfc8b059"
 
 [[projects]]
   branch = "master"

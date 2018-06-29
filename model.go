@@ -174,7 +174,6 @@ available Next returns true, else false and resets the cursor postion to the
 beginning of the data.
 */
 func (mdl *Model) Next(pK, pV *interface{}) bool {
-	ret := true
 	mdl.mux.Lock()
 
 	mdl.pos++
