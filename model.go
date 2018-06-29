@@ -176,13 +176,12 @@ beginning of the data.
 func (mdl *Model) Next(pK, pV *interface{}) bool {
 	ret := true
 	mdl.mux.Lock()
+
 	mdl.pos++
 
-	// no data exists or data has been removed shorter since the last call,
-	// reset.
-	if len(mdl.data)-1 < mdl.pos {
+	// at the end of the data, reset.
+	if len(mdl.data) <= mdl.pos {
 		mdl.pos = -1
-		ret = false
 		mdl.mux.Unlock()
 		return false
 	}
@@ -193,14 +192,8 @@ func (mdl *Model) Next(pK, pV *interface{}) bool {
 	}
 	*pV = &Value{mdl.data[mdl.pos]}
 
-	// at the end of the data, reset.
-	if len(mdl.data) <= mdl.pos {
-		mdl.pos = -1
-		ret = false
-	}
 	mdl.mux.Unlock()
-
-	return ret
+	return true
 }
 
 /*
