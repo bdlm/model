@@ -45,6 +45,27 @@ func New(modelType std.ModelType) std.Model {
 }
 
 /*
+Cur implements std.Iterator.
+
+Cur reads the key and value at the current cursor postion into pK and pV
+respectively. Cur will return false if no iteration has begun, including
+following calls to Reset.
+*/
+func (mdl *Model) Cur(pK, pV *interface{}) bool {
+	if mdl.pos < 0 || mdl.pos >= len(mdl.data) {
+		return false
+	}
+
+	*pK = mdl.pos
+	if std.ModelTypeHash == mdl.typ {
+		*pK = mdl.idxHash[mdl.pos]
+	}
+	*pV = &Value{mdl.data[mdl.pos]}
+
+	return true
+}
+
+/*
 Delete removes a value from this model.
 */
 func (mdl *Model) Delete(key interface{}) error {
@@ -168,19 +189,47 @@ func (mdl *Model) Merge(model std.Model) error {
 /*
 Next implements std.Iterator.
 
-Next reads the key and value at the current cursor position into pK and pV
-respectively and moves the cursor forward one position. If more data is
-available Next returns true, else false and resets the cursor postion to the
-beginning of the data.
+Next moves the cursor forward one position before reading the key and value
+at the cursor position into pK and pV respectively. If data is available at
+that position and was written to pK and pV then Next returns true, else
+false to signify the end of the data and resets the cursor postion to the
+beginning of the data set (-1).
 */
 func (mdl *Model) Next(pK, pV *interface{}) bool {
 	mdl.mux.Lock()
-
 	mdl.pos++
 
 	// at the end of the data, reset.
 	if len(mdl.data) <= mdl.pos {
 		mdl.pos = -1
+		mdl.mux.Unlock()
+		return false
+	}
+
+	*pK = mdl.pos
+	if std.ModelTypeHash == mdl.typ {
+		*pK = mdl.idxHash[mdl.pos]
+	}
+	*pV = &Value{mdl.data[mdl.pos]}
+
+	mdl.mux.Unlock()
+	return true
+}
+
+/*
+Prev implements std.Iterator.
+
+Prev moves the cursor backward one position before reading the key and value
+at the cursor position into pK and pV respectively. If data is available at
+that position and was written to pK and pV then Prev returns true, else
+false to signify the beginning of the data.
+*/
+func (mdl *Model) Prev(pK, pV *interface{}) bool {
+	mdl.mux.Lock()
+	mdl.pos--
+
+	// at the beginning of the data, stop.
+	if mdl.pos < 0 {
 		mdl.mux.Unlock()
 		return false
 	}
@@ -235,11 +284,37 @@ func (mdl *Model) Reverse() {
 }
 
 /*
+Seek implements std.Iterator.
+
+Seek sets the iterator cursor position.
+*/
+func (mdl *Model) Seek(pos interface{}) error {
+	// List model
+	if std.ModelTypeList == mdl.typ {
+		idx := pos.(int)
+		if idx >= len(mdl.data) {
+			return errors.New(InvalidIndex, "the specified position '%d' is beyond the end of the data", idx)
+		} else if idx < 0 {
+			return errors.New(InvalidIndex, "invalid index '%d'", idx)
+		}
+		mdl.pos = idx - 1
+		return nil
+	}
+
+	// Hash model
+	hashKey := pos.(string)
+	if idx, ok := mdl.hashIdx[hashKey]; ok {
+		mdl.pos = idx - 1
+	}
+	return errors.New(InvalidIndex, "the specified position '%s' does not exist", hashKey)
+}
+
+/*
 Set stores a value in the internal data store. All values must be identified
 by key.
 */
 func (mdl *Model) Set(key interface{}, value interface{}) error {
-	// type Hash
+	// Hash model
 	if std.ModelTypeHash == mdl.typ {
 		// hash keys are always strings
 		idx := toString(key)
@@ -255,7 +330,7 @@ func (mdl *Model) Set(key interface{}, value interface{}) error {
 		return nil
 	}
 
-	// type List
+	// List model
 	switch key.(type) {
 	case int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64:
@@ -315,11 +390,7 @@ func toString(v interface{}) string {
 			v = v.(string) + string([]rune(p[1])[:10])
 		}
 	case float64:
-		p := strings.Split(fmt.Sprintf("%.25f", v.(float64)), ".")
-		v = p[0]
-		if 2 == len(p) {
-			v = v.(string) + "." + string([]rune(p[1])[:10])
-		}
+		v = fmt.Sprintf("%.10f", v.(float64))
 	default:
 		v = fmt.Sprintf("%v", v)
 	}
