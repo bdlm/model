@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -34,7 +35,7 @@ type Model struct {
 /*
 New returns a new std.Model.
 */
-func New(modelType std.ModelType) std.Model {
+func New(modelType std.ModelType) *Model {
 	return &Model{
 		mux:     &sync.Mutex{},
 		typ:     modelType,
@@ -57,7 +58,7 @@ func (mdl *Model) Cur(pK, pV *interface{}) bool {
 	}
 
 	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.typ {
+	if std.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
 	*pV = &Value{mdl.data[mdl.pos]}
@@ -71,7 +72,7 @@ Delete removes a value from this model.
 func (mdl *Model) Delete(key interface{}) error {
 	mdl.mux.Lock()
 	defer mdl.mux.Unlock()
-	if std.ModelTypeList == mdl.typ {
+	if std.ModelTypeList == mdl.GetType() {
 		k := key.(int)
 		if k > len(mdl.data) {
 			return errors.New(InvalidIndex, "index '%d' out of range", k)
@@ -102,7 +103,7 @@ func (mdl *Model) Filter(callback func(std.Value) std.Model) std.Model {
 Get returns the specified data value in this model.
 */
 func (mdl *Model) Get(key interface{}) (std.Value, error) {
-	if std.ModelTypeHash == mdl.typ {
+	if std.ModelTypeHash == mdl.GetType() {
 		var ok bool
 		var idx int
 
@@ -173,6 +174,27 @@ func (mdl *Model) Lock() {
 }
 
 /*
+MarshalJSON implements json.Marshaler.
+*/
+func (mdl *Model) MarshalJSON() ([]byte, error) {
+	if std.ModelTypeList == mdl.GetType() {
+		return json.Marshal(mdl.data)
+	}
+	d := map[string]interface{}{}
+	for k, v := range mdl.data {
+		d[mdl.idxHash[k]] = v
+	}
+	return json.Marshal(d)
+}
+
+/*
+MarshalModel implements Marshaler.
+*/
+func (mdl *Model) MarshalModel() ([]byte, error) {
+	return mdl.MarshalJSON()
+}
+
+/*
 Map applies a callback to all elements in this model and returns the result.
 */
 func (mdl *Model) Map(callback func(std.Value) std.Model) std.Model {
@@ -207,10 +229,14 @@ func (mdl *Model) Next(pK, pV *interface{}) bool {
 	}
 
 	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.typ {
+	if std.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
-	*pV = &Value{mdl.data[mdl.pos]}
+	if tmp, ok := mdl.data[mdl.pos].(*Value); ok {
+		*pV = tmp
+	} else {
+		*pV = &Value{mdl.data[mdl.pos]}
+	}
 
 	mdl.mux.Unlock()
 	return true
@@ -235,7 +261,7 @@ func (mdl *Model) Prev(pK, pV *interface{}) bool {
 	}
 
 	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.typ {
+	if std.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
 	*pV = &Value{mdl.data[mdl.pos]}
@@ -248,8 +274,12 @@ func (mdl *Model) Prev(pK, pV *interface{}) bool {
 Push a value to the end of the internal data store.
 */
 func (mdl *Model) Push(value interface{}) error {
+	if raw, ok := value.(std.Value); ok {
+		value = raw
+	}
+
 	// std.ModelTypeList only
-	if std.ModelTypeList != mdl.typ {
+	if std.ModelTypeList != mdl.GetType() {
 		return errors.New(InvalidMethodContext, "Push() is only valid for std.ModelTypeList model types")
 	}
 
@@ -290,7 +320,7 @@ Seek sets the iterator cursor position.
 */
 func (mdl *Model) Seek(pos interface{}) error {
 	// List model
-	if std.ModelTypeList == mdl.typ {
+	if std.ModelTypeList == mdl.GetType() {
 		idx := pos.(int)
 		if idx >= len(mdl.data) {
 			return errors.New(InvalidIndex, "the specified position '%d' is beyond the end of the data", idx)
@@ -314,8 +344,12 @@ Set stores a value in the internal data store. All values must be identified
 by key.
 */
 func (mdl *Model) Set(key interface{}, value interface{}) error {
+	if raw, ok := value.(std.Value); ok {
+		value = raw
+	}
+
 	// Hash model
-	if std.ModelTypeHash == mdl.typ {
+	if std.ModelTypeHash == mdl.GetType() {
 		// hash keys are always strings
 		idx := toString(key)
 		mdl.mux.Lock()
@@ -355,6 +389,33 @@ func (mdl *Model) SetID(id interface{}) {
 }
 
 /*
+SetData replaces the current data stored in the model with the provided
+data.
+*/
+func (mdl *Model) SetData(data interface{}) error {
+	if std.ModelTypeList == mdl.GetType() {
+		d, ok := data.([]interface{})
+		if !ok {
+			return errors.New(InvalidDataType, "invalid data set for list model")
+		}
+		mdl.data = d
+	}
+
+	d, ok := data.(map[string]interface{})
+	if !ok {
+		return errors.New(InvalidDataType, "invalid data set for hash model")
+	}
+
+	mdl.data = []interface{}{}
+	for k, v := range d {
+		mdl.hashIdx[k] = len(mdl.data)
+		mdl.idxHash[len(mdl.data)] = k
+		mdl.data = append(mdl.data, v)
+	}
+	return nil
+}
+
+/*
 SetType sets the model type. If any data is stored in this model, this
 property becomes read-only.
 */
@@ -371,6 +432,84 @@ Sort sorts the model data.
 */
 func (mdl *Model) Sort(flags uintptr) error {
 	return nil
+}
+
+func importMap(data map[string]interface{}, node *Model) *Model {
+	for k, v := range data {
+		switch typedV := v.(type) {
+		case map[string]interface{}:
+			n := New(std.ModelTypeHash)
+			node.Set(k, importMap(typedV, n))
+		case []interface{}:
+			n := New(std.ModelTypeList)
+			node.Set(k, importSlice(typedV, n))
+		default:
+			if std.ModelTypeHash == node.GetType() {
+				node.Set(k, v)
+			}
+			if std.ModelTypeList == node.GetType() {
+				node.Push(v)
+			}
+		}
+	}
+	return node
+}
+
+func importSlice(data []interface{}, node *Model) *Model {
+	for k, v := range data {
+		switch typedV := v.(type) {
+		case map[string]interface{}:
+			n := New(std.ModelTypeHash)
+			node.Set(k, importMap(typedV, n))
+		case []interface{}:
+			n := New(std.ModelTypeList)
+			node.Set(k, importSlice(typedV, n))
+		default:
+			if std.ModelTypeHash == node.GetType() {
+				node.Set(k, v)
+			}
+			if std.ModelTypeList == node.GetType() {
+				node.Push(v)
+			}
+		}
+	}
+	return node
+}
+
+func (mdl *Model) importData(data interface{}) error {
+	switch typedData := data.(type) {
+	case map[string]interface{}:
+		importMap(typedData, mdl)
+	case []interface{}:
+		importSlice(typedData, mdl)
+	}
+	return nil
+}
+
+/*
+UnmarshalJSON implements json.Unmarshaler.
+*/
+func (mdl *Model) UnmarshalJSON(jsn []byte) error {
+	var data interface{}
+
+	err := json.Unmarshal(jsn, &data)
+	if nil != err {
+		return errors.Wrap(
+			err,
+			errors.ErrInvalidJSON,
+			"unmarshaling failed",
+		)
+	}
+	mdl.importData(data)
+
+	return nil
+}
+
+/*
+UnmarshalModel implements Marshaler.
+*/
+func (mdl *Model) UnmarshalModel() ([]byte, error) {
+	return mdl.MarshalJSON()
 }
 
 /*

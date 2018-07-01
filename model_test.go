@@ -18,8 +18,8 @@ func init() {
 }
 
 func TestNewHash(t *testing.T) {
-	mdl := model.New(std.ModelTypeHash)
-	mdl.Set("key1", "val1")
+	//mdl := model.New(std.ModelTypeHash)
+	//mdl.Set("key1", "val1")
 	//val, err := mdl.Get("key")
 	//str, err2 := val.String()
 	//t.Errorf("%v - %v (%v)", str, err2, err)
@@ -67,7 +67,7 @@ func TestModelType(t *testing.T) {
 	mdl.Set(float, "1234567890.0000000000") // 10-digit precision...
 	mdl.Set(err, "err-key")
 	var key, val interface{}
-	for mdl.(std.Iterator).Next(&key, &val) {
+	for mdl.Next(&key, &val) {
 		v, err := val.(std.Value).String()
 		if nil != err {
 			t.Errorf("expected nil, received error: '%v'", err)

@@ -21,6 +21,8 @@ const (
 
 	// ReadOnlyProperty - An attemt was made to modify a read-only property.
 	ReadOnlyProperty
+
+	InvalidDataType
 )
 
 func init() {
