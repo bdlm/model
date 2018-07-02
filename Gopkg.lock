@@ -17,7 +17,7 @@
   branch = "modeling"
   name = "github.com/bdlm/std"
   packages = ["."]
-  revision = "3b94f024047b16c0daf540f91aea6dd0f5a8305c"
+  revision = "9e6649e244669e14139b635d776c399a6b029992"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
