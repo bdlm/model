@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -61,9 +62,20 @@ func (mdl *Model) Cur(pK, pV *interface{}) bool {
 	if std.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
-	*pV = &Value{mdl.data[mdl.pos]}
+	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
+		*pV = tmp
+	} else {
+		*pV = &Value{mdl.data[mdl.pos]}
+	}
 
 	return true
+}
+
+/*
+Delete removes a value from this model.
+*/
+func (mdl *Model) Data() ([]interface{}, map[string]int, map[int]string) {
+	return mdl.data, mdl.hashIdx, mdl.idxHash
 }
 
 /*
@@ -132,7 +144,7 @@ func (mdl *Model) Get(key interface{}) (std.Value, error) {
 		ret := mdl.data[key.(int)]
 		return &Value{ret}, nil
 	default:
-		return nil, errors.New(InvalidIndexType, "key '%v' is must be an integer", key)
+		return nil, errors.New(InvalidIndexType, "key '%v' must be an integer", key)
 	}
 }
 
@@ -232,7 +244,7 @@ func (mdl *Model) Next(pK, pV *interface{}) bool {
 	if std.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
-	if tmp, ok := mdl.data[mdl.pos].(*Value); ok {
+	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
 		*pV = tmp
 	} else {
 		*pV = &Value{mdl.data[mdl.pos]}
@@ -264,7 +276,11 @@ func (mdl *Model) Prev(pK, pV *interface{}) bool {
 	if std.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
-	*pV = &Value{mdl.data[mdl.pos]}
+	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
+		*pV = tmp
+	} else {
+		*pV = &Value{mdl.data[mdl.pos]}
+	}
 
 	mdl.mux.Unlock()
 	return true
@@ -430,9 +446,36 @@ func (mdl *Model) SetType(typ std.ModelType) error {
 /*
 Sort sorts the model data.
 */
-func (mdl *Model) Sort(flags uintptr) error {
+func (mdl *Model) Sort(flag int) error {
+	data := []interface{}{}
+	hashIdx := map[string]int{}
+	idxHash := map[int]string{}
+	switch flag {
+	case SortByKey:
+		if std.ModelTypeHash == mdl.GetType() {
+			order := []string{}
+			for _, v := range mdl.idxHash {
+				order = append(order, v)
+			}
+			sort.Strings(order)
+			for _, v := range order {
+				hashIdx[v] = len(data)
+				idxHash[len(data)] = v
+				data = append(data, mdl.data[mdl.hashIdx[v]])
+			}
+			mdl.data = data
+			mdl.hashIdx = hashIdx
+			mdl.idxHash = idxHash
+		}
+		if std.ModelTypeList == mdl.GetType() {
+		}
+	}
 	return nil
 }
+
+const (
+	SortByKey int = iota
+)
 
 func importMap(data map[string]interface{}, node *Model) *Model {
 	for k, v := range data {
@@ -452,36 +495,33 @@ func importMap(data map[string]interface{}, node *Model) *Model {
 			}
 		}
 	}
+	node.Sort(SortByKey)
 	return node
 }
 
 func importSlice(data []interface{}, node *Model) *Model {
-	for k, v := range data {
+	for _, v := range data {
 		switch typedV := v.(type) {
 		case map[string]interface{}:
 			n := New(std.ModelTypeHash)
-			node.Set(k, importMap(typedV, n))
+			node.Push(importMap(typedV, n))
 		case []interface{}:
 			n := New(std.ModelTypeList)
-			node.Set(k, importSlice(typedV, n))
+			node.Push(importSlice(typedV, n))
 		default:
-			if std.ModelTypeHash == node.GetType() {
-				node.Set(k, v)
-			}
-			if std.ModelTypeList == node.GetType() {
-				node.Push(v)
-			}
+			node.Push(v)
 		}
 	}
+	node.Sort(SortByKey)
 	return node
 }
 
-func (mdl *Model) importData(data interface{}) error {
+func (mdl *Model) importData(data interface{}) *Model {
 	switch typedData := data.(type) {
 	case map[string]interface{}:
-		importMap(typedData, mdl)
+		return importMap(typedData, mdl)
 	case []interface{}:
-		importSlice(typedData, mdl)
+		return importSlice(typedData, mdl)
 	}
 	return nil
 }
