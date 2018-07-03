@@ -19,10 +19,12 @@ const (
 	// current context. E.g. the Push() method on hash models.
 	InvalidMethodContext
 
-	// ReadOnlyProperty - An attemt was made to modify a read-only property.
+	// ReadOnlyProperty - An attempt was made to modify a read-only property.
 	ReadOnlyProperty
 
-	InvalidDataType
+	// InvalidDataSet - An attempt was made to store a data set that is
+	// with the model type
+	InvalidDataSet
 )
 
 func init() {

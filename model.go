@@ -1,9 +1,7 @@
 package model
 
 import (
-	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 
@@ -47,32 +45,7 @@ func New(modelType std.ModelType) *Model {
 }
 
 /*
-Cur implements std.Iterator.
-
-Cur reads the key and value at the current cursor postion into pK and pV
-respectively. Cur will return false if no iteration has begun, including
-following calls to Reset.
-*/
-func (mdl *Model) Cur(pK, pV *interface{}) bool {
-	if mdl.pos < 0 || mdl.pos >= len(mdl.data) {
-		return false
-	}
-
-	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.GetType() {
-		*pK = mdl.idxHash[mdl.pos]
-	}
-	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
-		*pV = tmp
-	} else {
-		*pV = &Value{mdl.data[mdl.pos]}
-	}
-
-	return true
-}
-
-/*
-Delete removes a value from this model.
+Data returns the current data set and indexes.
 */
 func (mdl *Model) Data() ([]interface{}, map[string]int, map[int]string) {
 	return mdl.data, mdl.hashIdx, mdl.idxHash
@@ -186,27 +159,6 @@ func (mdl *Model) Lock() {
 }
 
 /*
-MarshalJSON implements json.Marshaler.
-*/
-func (mdl *Model) MarshalJSON() ([]byte, error) {
-	if std.ModelTypeList == mdl.GetType() {
-		return json.Marshal(mdl.data)
-	}
-	d := map[string]interface{}{}
-	for k, v := range mdl.data {
-		d[mdl.idxHash[k]] = v
-	}
-	return json.Marshal(d)
-}
-
-/*
-MarshalModel implements Marshaler.
-*/
-func (mdl *Model) MarshalModel() ([]byte, error) {
-	return mdl.MarshalJSON()
-}
-
-/*
 Map applies a callback to all elements in this model and returns the result.
 */
 func (mdl *Model) Map(callback func(std.Value) std.Model) std.Model {
@@ -218,72 +170,6 @@ Merge merges data from any Model into this Model.
 */
 func (mdl *Model) Merge(model std.Model) error {
 	return nil
-}
-
-/*
-Next implements std.Iterator.
-
-Next moves the cursor forward one position before reading the key and value
-at the cursor position into pK and pV respectively. If data is available at
-that position and was written to pK and pV then Next returns true, else
-false to signify the end of the data and resets the cursor postion to the
-beginning of the data set (-1).
-*/
-func (mdl *Model) Next(pK, pV *interface{}) bool {
-	mdl.mux.Lock()
-	mdl.pos++
-
-	// at the end of the data, reset.
-	if len(mdl.data) <= mdl.pos {
-		mdl.pos = -1
-		mdl.mux.Unlock()
-		return false
-	}
-
-	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.GetType() {
-		*pK = mdl.idxHash[mdl.pos]
-	}
-	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
-		*pV = tmp
-	} else {
-		*pV = &Value{mdl.data[mdl.pos]}
-	}
-
-	mdl.mux.Unlock()
-	return true
-}
-
-/*
-Prev implements std.Iterator.
-
-Prev moves the cursor backward one position before reading the key and value
-at the cursor position into pK and pV respectively. If data is available at
-that position and was written to pK and pV then Prev returns true, else
-false to signify the beginning of the data.
-*/
-func (mdl *Model) Prev(pK, pV *interface{}) bool {
-	mdl.mux.Lock()
-	mdl.pos--
-
-	// at the beginning of the data, stop.
-	if mdl.pos < 0 {
-		mdl.mux.Unlock()
-		return false
-	}
-
-	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.GetType() {
-		*pK = mdl.idxHash[mdl.pos]
-	}
-	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
-		*pV = tmp
-	} else {
-		*pV = &Value{mdl.data[mdl.pos]}
-	}
-
-	mdl.mux.Unlock()
-	return true
 }
 
 /*
@@ -314,45 +200,10 @@ func (mdl *Model) Reduce(callback func(std.Value) bool) std.Value {
 }
 
 /*
-Reset implements std.Iterator.
-
-Reset sets the iterator cursor position.
-*/
-func (mdl *Model) Reset() {
-	mdl.pos = -1
-}
-
-/*
 Reverse reverses the order of the data store.
 */
 func (mdl *Model) Reverse() {
 	return
-}
-
-/*
-Seek implements std.Iterator.
-
-Seek sets the iterator cursor position.
-*/
-func (mdl *Model) Seek(pos interface{}) error {
-	// List model
-	if std.ModelTypeList == mdl.GetType() {
-		idx := pos.(int)
-		if idx >= len(mdl.data) {
-			return errors.New(InvalidIndex, "the specified position '%d' is beyond the end of the data", idx)
-		} else if idx < 0 {
-			return errors.New(InvalidIndex, "invalid index '%d'", idx)
-		}
-		mdl.pos = idx - 1
-		return nil
-	}
-
-	// Hash model
-	hashKey := pos.(string)
-	if idx, ok := mdl.hashIdx[hashKey]; ok {
-		mdl.pos = idx - 1
-	}
-	return errors.New(InvalidIndex, "the specified position '%s' does not exist", hashKey)
 }
 
 /*
@@ -412,14 +263,14 @@ func (mdl *Model) SetData(data interface{}) error {
 	if std.ModelTypeList == mdl.GetType() {
 		d, ok := data.([]interface{})
 		if !ok {
-			return errors.New(InvalidDataType, "invalid data set for list model")
+			return errors.New(InvalidDataSet, "invalid data set for list model")
 		}
 		mdl.data = d
 	}
 
 	d, ok := data.(map[string]interface{})
 	if !ok {
-		return errors.New(InvalidDataType, "invalid data set for hash model")
+		return errors.New(InvalidDataSet, "invalid data set for hash model")
 	}
 
 	mdl.data = []interface{}{}
@@ -441,115 +292,6 @@ func (mdl *Model) SetType(typ std.ModelType) error {
 	}
 	mdl.typ = typ
 	return nil
-}
-
-/*
-Sort sorts the model data.
-*/
-func (mdl *Model) Sort(flag int) error {
-	data := []interface{}{}
-	hashIdx := map[string]int{}
-	idxHash := map[int]string{}
-	switch flag {
-	case SortByKey:
-		if std.ModelTypeHash == mdl.GetType() {
-			order := []string{}
-			for _, v := range mdl.idxHash {
-				order = append(order, v)
-			}
-			sort.Strings(order)
-			for _, v := range order {
-				hashIdx[v] = len(data)
-				idxHash[len(data)] = v
-				data = append(data, mdl.data[mdl.hashIdx[v]])
-			}
-			mdl.data = data
-			mdl.hashIdx = hashIdx
-			mdl.idxHash = idxHash
-		}
-		if std.ModelTypeList == mdl.GetType() {
-		}
-	}
-	return nil
-}
-
-const (
-	SortByKey int = iota
-)
-
-func importMap(data map[string]interface{}, node *Model) *Model {
-	for k, v := range data {
-		switch typedV := v.(type) {
-		case map[string]interface{}:
-			n := New(std.ModelTypeHash)
-			node.Set(k, importMap(typedV, n))
-		case []interface{}:
-			n := New(std.ModelTypeList)
-			node.Set(k, importSlice(typedV, n))
-		default:
-			if std.ModelTypeHash == node.GetType() {
-				node.Set(k, v)
-			}
-			if std.ModelTypeList == node.GetType() {
-				node.Push(v)
-			}
-		}
-	}
-	node.Sort(SortByKey)
-	return node
-}
-
-func importSlice(data []interface{}, node *Model) *Model {
-	for _, v := range data {
-		switch typedV := v.(type) {
-		case map[string]interface{}:
-			n := New(std.ModelTypeHash)
-			node.Push(importMap(typedV, n))
-		case []interface{}:
-			n := New(std.ModelTypeList)
-			node.Push(importSlice(typedV, n))
-		default:
-			node.Push(v)
-		}
-	}
-	node.Sort(SortByKey)
-	return node
-}
-
-func (mdl *Model) importData(data interface{}) *Model {
-	switch typedData := data.(type) {
-	case map[string]interface{}:
-		return importMap(typedData, mdl)
-	case []interface{}:
-		return importSlice(typedData, mdl)
-	}
-	return nil
-}
-
-/*
-UnmarshalJSON implements json.Unmarshaler.
-*/
-func (mdl *Model) UnmarshalJSON(jsn []byte) error {
-	var data interface{}
-
-	err := json.Unmarshal(jsn, &data)
-	if nil != err {
-		return errors.Wrap(
-			err,
-			errors.ErrInvalidJSON,
-			"unmarshaling failed",
-		)
-	}
-	mdl.importData(data)
-
-	return nil
-}
-
-/*
-UnmarshalModel implements Marshaler.
-*/
-func (mdl *Model) UnmarshalModel() ([]byte, error) {
-	return mdl.MarshalJSON()
 }
 
 /*
