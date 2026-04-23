@@ -1,13 +1,17 @@
 package model
 
 import (
-	"fmt"
-	"strings"
 	"sync"
 
+	"github.com/bdlm/cast/v2"
 	"github.com/bdlm/errors/v2"
 	stdModel "github.com/bdlm/std/v2/model"
 )
+
+/*
+modelType is a data type for defining Model types.
+*/
+type modelType int
 
 const (
 	// Dict defines a dictionary model type.
@@ -20,12 +24,12 @@ const (
 Model defines the model data structure.
 */
 type Model struct {
-	id     interface{}        // model identifier
+	id     any                // model identifier
 	locked bool               // model read-only flag
 	typ    stdModel.ModelType // model type, either stdModel.ModelTypeHash or stdModel.ModelTypeList
 
 	mux     *sync.Mutex    // goroutine-safe
-	data    []interface{}  // data store
+	data    []any          // data store
 	hashIdx map[string]int // stdModel.ModelTypeHash data index
 	idxHash map[int]string // stdModel.ModelTypeHash hash index
 	pos     int            // current stdModel.Iterator cursor position
@@ -47,14 +51,14 @@ func New(modelType stdModel.ModelType) *Model {
 /*
 Data returns the current data set and indexes.
 */
-func (mdl *Model) Data() ([]interface{}, map[string]int, map[int]string) {
+func (mdl *Model) Data() ([]any, map[string]int, map[int]string) {
 	return mdl.data, mdl.hashIdx, mdl.idxHash
 }
 
 /*
 Delete removes a value from this model.
 */
-func (mdl *Model) Delete(key interface{}) error {
+func (mdl *Model) Delete(key any) error {
 	mdl.mux.Lock()
 	defer mdl.mux.Unlock()
 	if stdModel.ModelTypeList == mdl.GetType() {
@@ -87,13 +91,13 @@ func (mdl *Model) Filter(callback func(stdModel.Value) stdModel.Model) stdModel.
 /*
 Get returns the specified data value in this model.
 */
-func (mdl *Model) Get(key interface{}) (stdModel.Value, error) {
+func (mdl *Model) Get(key any) (stdModel.Value, error) {
 	if stdModel.ModelTypeHash == mdl.GetType() {
 		var ok bool
 		var idx int
 
 		// hash keys are always strings
-		hashIdx := toString(key)
+		hashIdx := cast.To[string](key)
 
 		mdl.mux.Lock()
 		defer mdl.mux.Unlock()
@@ -124,7 +128,7 @@ func (mdl *Model) Get(key interface{}) (stdModel.Value, error) {
 /*
 GetID returns returns this model's id.
 */
-func (mdl *Model) GetID() interface{} {
+func (mdl *Model) GetID() any {
 	return mdl.id
 }
 
@@ -138,7 +142,7 @@ func (mdl *Model) GetType() stdModel.ModelType {
 /*
 Has tests to see of a specified data element exists in this model.
 */
-func (mdl *Model) Has(key interface{}) bool {
+func (mdl *Model) Has(key any) bool {
 	if stdModel.ModelTypeList == mdl.GetType() {
 		if k, ok := key.(int); ok && k < len(mdl.data) {
 			return true
@@ -175,7 +179,7 @@ func (mdl *Model) Merge(model stdModel.Model) error {
 /*
 Push a value to the end of the internal data store.
 */
-func (mdl *Model) Push(value interface{}) error {
+func (mdl *Model) Push(value any) error {
 	if raw, ok := value.(stdModel.Value); ok {
 		value = raw
 	}
@@ -210,7 +214,7 @@ func (mdl *Model) Reverse() {
 Set stores a value in the internal data store. All values must be identified
 by key.
 */
-func (mdl *Model) Set(key interface{}, value interface{}) error {
+func (mdl *Model) Set(key any, value any) error {
 	if raw, ok := value.(stdModel.Value); ok {
 		value = raw
 	}
@@ -218,7 +222,7 @@ func (mdl *Model) Set(key interface{}, value interface{}) error {
 	// Hash model
 	if stdModel.ModelTypeHash == mdl.GetType() {
 		// hash keys are always strings
-		idx := toString(key)
+		idx := cast.To[string](key)
 		mdl.mux.Lock()
 		defer mdl.mux.Unlock()
 		if _, ok := mdl.hashIdx[idx]; !ok {
@@ -251,7 +255,7 @@ func (mdl *Model) Set(key interface{}, value interface{}) error {
 /*
 SetID sets this Model's identifier property.
 */
-func (mdl *Model) SetID(id interface{}) {
+func (mdl *Model) SetID(id any) {
 	mdl.id = id
 }
 
@@ -259,21 +263,21 @@ func (mdl *Model) SetID(id interface{}) {
 SetData replaces the current data stored in the model with the provided
 data.
 */
-func (mdl *Model) SetData(data interface{}) error {
+func (mdl *Model) SetData(data any) error {
 	if stdModel.ModelTypeList == mdl.GetType() {
-		d, ok := data.([]interface{})
+		d, ok := data.([]any)
 		if !ok {
 			return errors.WrapE(InvalidDataSet, errors.Errorf("invalid data set for list model"))
 		}
 		mdl.data = d
 	}
 
-	d, ok := data.(map[string]interface{})
+	d, ok := data.(map[string]any)
 	if !ok {
 		return errors.WrapE(InvalidDataSet, errors.Errorf("invalid data set for hash model"))
 	}
 
-	mdl.data = []interface{}{}
+	mdl.data = []any{}
 	for k, v := range d {
 		mdl.hashIdx[k] = len(mdl.data)
 		mdl.idxHash[len(mdl.data)] = k
@@ -292,28 +296,4 @@ func (mdl *Model) SetType(typ stdModel.ModelType) error {
 	}
 	mdl.typ = typ
 	return nil
-}
-
-/*
-modelType is a data type for defining Model types.
-*/
-type modelType int
-
-func toString(v interface{}) string {
-	switch v.(type) {
-	case string, []byte, []rune:
-	case int, int8, int16, int32, int64:
-		v = fmt.Sprintf("%d", v.(int))
-	case float32:
-		p := strings.Split(fmt.Sprintf("%.25f", v.(float32)), ".")
-		v = p[0]
-		if 2 == len(p) {
-			v = v.(string) + string([]rune(p[1])[:10])
-		}
-	case float64:
-		v = fmt.Sprintf("%.10f", v.(float64))
-	default:
-		v = fmt.Sprintf("%v", v)
-	}
-	return v.(string)
 }
