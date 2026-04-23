@@ -3,15 +3,15 @@ package model
 import (
 	"encoding/json"
 
-	"github.com/bdlm/errors"
-	"github.com/bdlm/std"
+	"github.com/bdlm/errors/v2"
+	stdModel "github.com/bdlm/std/v2/model"
 )
 
 /*
 MarshalJSON implements json.Marshaler.
 */
 func (mdl *Model) MarshalJSON() ([]byte, error) {
-	if std.ModelTypeList == mdl.GetType() {
+	if stdModel.ModelTypeList == mdl.GetType() {
 		return json.Marshal(mdl.data)
 	}
 	d := map[string]interface{}{}
@@ -36,11 +36,7 @@ func (mdl *Model) UnmarshalJSON(jsn []byte) error {
 
 	err := json.Unmarshal(jsn, &data)
 	if nil != err {
-		return errors.Wrap(
-			err,
-			errors.ErrInvalidJSON,
-			"unmarshaling failed",
-		)
+		return errors.Wrap(err, "unmarshaling failed")
 	}
 	mdl.importData(data)
 

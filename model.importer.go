@@ -1,26 +1,29 @@
 package model
 
-import "github.com/bdlm/std"
+import (
+	stdModel "github.com/bdlm/std/v2/model"
+	stdSorter "github.com/bdlm/std/v2/sorter"
+)
 
 func importMap(data map[string]interface{}, node *Model) *Model {
 	for k, v := range data {
 		switch typedV := v.(type) {
 		case map[string]interface{}:
-			n := New(std.ModelTypeHash)
+			n := New(stdModel.ModelTypeHash)
 			node.Set(k, importMap(typedV, n))
 		case []interface{}:
-			n := New(std.ModelTypeList)
+			n := New(stdModel.ModelTypeList)
 			node.Set(k, importSlice(typedV, n))
 		default:
-			if std.ModelTypeHash == node.GetType() {
+			if stdModel.ModelTypeHash == node.GetType() {
 				node.Set(k, v)
 			}
-			if std.ModelTypeList == node.GetType() {
+			if stdModel.ModelTypeList == node.GetType() {
 				node.Push(v)
 			}
 		}
 	}
-	node.Sort(std.SortByKey)
+	node.Sort(stdSorter.SortByKey)
 	return node
 }
 
@@ -28,16 +31,16 @@ func importSlice(data []interface{}, node *Model) *Model {
 	for _, v := range data {
 		switch typedV := v.(type) {
 		case map[string]interface{}:
-			n := New(std.ModelTypeHash)
+			n := New(stdModel.ModelTypeHash)
 			node.Push(importMap(typedV, n))
 		case []interface{}:
-			n := New(std.ModelTypeList)
+			n := New(stdModel.ModelTypeList)
 			node.Push(importSlice(typedV, n))
 		default:
 			node.Push(v)
 		}
 	}
-	node.Sort(std.SortByKey)
+	node.Sort(stdSorter.SortByKey)
 	return node
 }
 

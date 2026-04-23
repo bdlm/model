@@ -3,19 +3,20 @@ package model
 import (
 	"sort"
 
-	"github.com/bdlm/std"
+	stdModel "github.com/bdlm/std/v2/model"
+	stdSorter "github.com/bdlm/std/v2/sorter"
 )
 
 /*
 Sort sorts the model data.
 */
-func (mdl *Model) Sort(flag std.SortFlag) error {
+func (mdl *Model) Sort(flag stdSorter.SortFlag) error {
 	data := []interface{}{}
 	hashIdx := map[string]int{}
 	idxHash := map[int]string{}
 	switch flag {
-	case std.SortByKey:
-		if std.ModelTypeHash == mdl.GetType() {
+	case stdSorter.SortByKey:
+		if stdModel.ModelTypeHash == mdl.GetType() {
 			order := []string{}
 			for _, v := range mdl.idxHash {
 				order = append(order, v)
@@ -30,7 +31,7 @@ func (mdl *Model) Sort(flag std.SortFlag) error {
 			mdl.hashIdx = hashIdx
 			mdl.idxHash = idxHash
 		}
-		if std.ModelTypeList == mdl.GetType() {
+		if stdModel.ModelTypeList == mdl.GetType() {
 		}
 	}
 	return nil

@@ -2,18 +2,32 @@ package model_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
-	"github.com/bdlm/errors"
-	"github.com/bdlm/logfmt"
+	"github.com/bdlm/log/v2"
 	"github.com/bdlm/model"
-	"github.com/bdlm/std"
-	log "github.com/sirupsen/logrus"
+	stdError "github.com/bdlm/std/v2/errors"
+	stdModel "github.com/bdlm/std/v2/model"
 )
 
 func init() {
 	level, _ := log.ParseLevel("debug")
-	log.SetFormatter(&logfmt.TextFormat{})
+	// Define the log format.
+	if os.Getenv("SERVER_ENV") == "dev" {
+		log.SetFormatter(&log.TextFormatter{
+			ForceTTY:    true,
+			EnableTrace: false,
+		})
+		log.Debug("TTY formatting enabled")
+	} else {
+		// See https://github.com/validityhq/vfe-inbox-api/blob/main/scalyr-log-parser.txt
+		log.SetFormatter(&log.JSONFormatter{
+			FieldMap: log.FieldMap{
+				"data": "_",
+			},
+		})
+	}
 	log.SetLevel(level)
 }
 
@@ -44,17 +58,17 @@ func TestHashIterator(t *testing.T) {
 }
 
 func TestModelType(t *testing.T) {
-	mdl := model.New(std.ModelTypeHash)
+	mdl := model.New(stdModel.ModelTypeHash)
 
 	// Push is only valid for std.ModelTypeList model types
 	err := mdl.Push("val1")
 	if nil == err {
 		t.Errorf("expected error, received nil")
 	}
-	if e, ok := err.(errors.Err); !ok {
+	if e, ok := err.(stdError.Error); !ok {
 		t.Errorf("expected errors.Err, received '%v'", err)
-	} else if e.Code() != model.InvalidMethodContext {
-		t.Errorf("expected model.InvalidMethodContext, received '%v'", e.Code())
+	} else if model.InvalidMethodContext.Is(e) {
+		t.Errorf("expected model.InvalidMethodContext, received '%v'", e)
 	}
 
 	// hash keys are always strings
@@ -68,7 +82,7 @@ func TestModelType(t *testing.T) {
 	mdl.Set(err, "err-key")
 	var key, val interface{}
 	for mdl.Next(&key, &val) {
-		v, err := val.(std.Value).String()
+		v, err := val.(stdModel.Value).String()
 		if nil != err {
 			t.Errorf("expected nil, received error: '%v'", err)
 		}

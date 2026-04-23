@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bdlm/errors"
-	"github.com/bdlm/std"
+	"github.com/bdlm/errors/v2"
+	stdModel "github.com/bdlm/std/v2/model"
 )
 
 const (
@@ -20,21 +20,21 @@ const (
 Model defines the model data structure.
 */
 type Model struct {
-	id     interface{}   // model identifier
-	locked bool          // model read-only flag
-	typ    std.ModelType // model type, either std.ModelTypeHash or std.ModelTypeList
+	id     interface{}        // model identifier
+	locked bool               // model read-only flag
+	typ    stdModel.ModelType // model type, either stdModel.ModelTypeHash or stdModel.ModelTypeList
 
 	mux     *sync.Mutex    // goroutine-safe
 	data    []interface{}  // data store
-	hashIdx map[string]int // std.ModelTypeHash data index
-	idxHash map[int]string // std.ModelTypeHash hash index
-	pos     int            // current std.Iterator cursor position
+	hashIdx map[string]int // stdModel.ModelTypeHash data index
+	idxHash map[int]string // stdModel.ModelTypeHash hash index
+	pos     int            // current stdModel.Iterator cursor position
 }
 
 /*
-New returns a new std.Model.
+New returns a new stdModel.Model.
 */
-func New(modelType std.ModelType) *Model {
+func New(modelType stdModel.ModelType) *Model {
 	return &Model{
 		mux:     &sync.Mutex{},
 		typ:     modelType,
@@ -57,10 +57,10 @@ Delete removes a value from this model.
 func (mdl *Model) Delete(key interface{}) error {
 	mdl.mux.Lock()
 	defer mdl.mux.Unlock()
-	if std.ModelTypeList == mdl.GetType() {
+	if stdModel.ModelTypeList == mdl.GetType() {
 		k := key.(int)
 		if k > len(mdl.data) {
-			return errors.New(InvalidIndex, "index '%d' out of range", k)
+			return errors.WrapE(InvalidIndex, errors.Errorf("index '%d' out of range", k))
 		}
 		mdl.data = append(mdl.data[:key.(int)-1], mdl.data[key.(int):]...)
 		return nil
@@ -73,22 +73,22 @@ func (mdl *Model) Delete(key interface{}) error {
 		delete(mdl.idxHash, idx)
 		return nil
 	}
-	return errors.New(InvalidIndex, "index '%s' out of range", k)
+	return errors.WrapE(InvalidIndex, errors.Errorf("index '%s' out of range", k))
 }
 
 /*
 Filter filters elements of the data using a callback function and returns
 the result.
 */
-func (mdl *Model) Filter(callback func(std.Value) std.Model) std.Model {
+func (mdl *Model) Filter(callback func(stdModel.Value) stdModel.Model) stdModel.Model {
 	return mdl
 }
 
 /*
 Get returns the specified data value in this model.
 */
-func (mdl *Model) Get(key interface{}) (std.Value, error) {
-	if std.ModelTypeHash == mdl.GetType() {
+func (mdl *Model) Get(key interface{}) (stdModel.Value, error) {
+	if stdModel.ModelTypeHash == mdl.GetType() {
 		var ok bool
 		var idx int
 
@@ -99,7 +99,7 @@ func (mdl *Model) Get(key interface{}) (std.Value, error) {
 		defer mdl.mux.Unlock()
 
 		if idx, ok = mdl.hashIdx[hashIdx]; !ok {
-			return nil, errors.New(InvalidIndex, "invalid index '%s'", hashIdx)
+			return nil, errors.WrapE(InvalidIndex, errors.Errorf("invalid index '%s'", hashIdx))
 		}
 
 		ret := mdl.data[idx]
@@ -112,12 +112,12 @@ func (mdl *Model) Get(key interface{}) (std.Value, error) {
 		mdl.mux.Lock()
 		defer mdl.mux.Unlock()
 		if key.(int) >= int(len(mdl.data)) {
-			return nil, errors.New(InvalidIndex, "invalid index %d", key.(int))
+			return nil, errors.WrapE(InvalidIndex, errors.Errorf("invalid index '%d'", key.(int)))
 		}
 		ret := mdl.data[key.(int)]
 		return &Value{ret}, nil
 	default:
-		return nil, errors.New(InvalidIndexType, "key '%v' must be an integer", key)
+		return nil, errors.WrapE(InvalidIndexType, errors.Errorf("key '%v' must be an integer", key))
 	}
 }
 
@@ -131,7 +131,7 @@ func (mdl *Model) GetID() interface{} {
 /*
 GetType returns the model type.
 */
-func (mdl *Model) GetType() std.ModelType {
+func (mdl *Model) GetType() stdModel.ModelType {
 	return mdl.typ
 }
 
@@ -139,7 +139,7 @@ func (mdl *Model) GetType() std.ModelType {
 Has tests to see of a specified data element exists in this model.
 */
 func (mdl *Model) Has(key interface{}) bool {
-	if std.ModelTypeList == mdl.GetType() {
+	if stdModel.ModelTypeList == mdl.GetType() {
 		if k, ok := key.(int); ok && k < len(mdl.data) {
 			return true
 		}
@@ -161,14 +161,14 @@ func (mdl *Model) Lock() {
 /*
 Map applies a callback to all elements in this model and returns the result.
 */
-func (mdl *Model) Map(callback func(std.Value) std.Model) std.Model {
+func (mdl *Model) Map(callback func(stdModel.Value) stdModel.Model) stdModel.Model {
 	return nil
 }
 
 /*
 Merge merges data from any Model into this Model.
 */
-func (mdl *Model) Merge(model std.Model) error {
+func (mdl *Model) Merge(model stdModel.Model) error {
 	return nil
 }
 
@@ -176,13 +176,13 @@ func (mdl *Model) Merge(model std.Model) error {
 Push a value to the end of the internal data store.
 */
 func (mdl *Model) Push(value interface{}) error {
-	if raw, ok := value.(std.Value); ok {
+	if raw, ok := value.(stdModel.Value); ok {
 		value = raw
 	}
 
-	// std.ModelTypeList only
-	if std.ModelTypeList != mdl.GetType() {
-		return errors.New(InvalidMethodContext, "Push() is only valid for std.ModelTypeList model types")
+	// stdModel.ModelTypeList only
+	if stdModel.ModelTypeList != mdl.GetType() {
+		return errors.WrapE(InvalidMethodContext, errors.Errorf("Push() is only valid for stdModel.ModelTypeList model types"))
 	}
 
 	mdl.mux.Lock()
@@ -195,7 +195,7 @@ func (mdl *Model) Push(value interface{}) error {
 Reduce iteratively reduces the data to a single value using a callback
 function and returns the result.
 */
-func (mdl *Model) Reduce(callback func(std.Value) bool) std.Value {
+func (mdl *Model) Reduce(callback func(stdModel.Value) bool) stdModel.Value {
 	return nil
 }
 
@@ -211,12 +211,12 @@ Set stores a value in the internal data store. All values must be identified
 by key.
 */
 func (mdl *Model) Set(key interface{}, value interface{}) error {
-	if raw, ok := value.(std.Value); ok {
+	if raw, ok := value.(stdModel.Value); ok {
 		value = raw
 	}
 
 	// Hash model
-	if std.ModelTypeHash == mdl.GetType() {
+	if stdModel.ModelTypeHash == mdl.GetType() {
 		// hash keys are always strings
 		idx := toString(key)
 		mdl.mux.Lock()
@@ -239,12 +239,12 @@ func (mdl *Model) Set(key interface{}, value interface{}) error {
 		mdl.mux.Lock()
 		defer mdl.mux.Unlock()
 		if k >= len(mdl.data) || k < 0 {
-			return errors.New(InvalidIndex, "invalid index '%d'", k)
+			return errors.WrapE(InvalidIndex, errors.Errorf("invalid index '%d'", k))
 		}
 		mdl.data[k] = value
 		return nil
 	default:
-		return errors.New(InvalidIndexType, "key '%v' is must be an integer", key)
+		return errors.WrapE(InvalidIndexType, errors.Errorf("key '%v' is must be an integer", key))
 	}
 }
 
@@ -260,17 +260,17 @@ SetData replaces the current data stored in the model with the provided
 data.
 */
 func (mdl *Model) SetData(data interface{}) error {
-	if std.ModelTypeList == mdl.GetType() {
+	if stdModel.ModelTypeList == mdl.GetType() {
 		d, ok := data.([]interface{})
 		if !ok {
-			return errors.New(InvalidDataSet, "invalid data set for list model")
+			return errors.WrapE(InvalidDataSet, errors.Errorf("invalid data set for list model"))
 		}
 		mdl.data = d
 	}
 
 	d, ok := data.(map[string]interface{})
 	if !ok {
-		return errors.New(InvalidDataSet, "invalid data set for hash model")
+		return errors.WrapE(InvalidDataSet, errors.Errorf("invalid data set for hash model"))
 	}
 
 	mdl.data = []interface{}{}
@@ -286,9 +286,9 @@ func (mdl *Model) SetData(data interface{}) error {
 SetType sets the model type. If any data is stored in this model, this
 property becomes read-only.
 */
-func (mdl *Model) SetType(typ std.ModelType) error {
+func (mdl *Model) SetType(typ stdModel.ModelType) error {
 	if len(mdl.data) > 0 {
-		return errors.New(ReadOnlyProperty, "model is not empty, type cannot be modified")
+		return errors.WrapE(ReadOnlyProperty, errors.Errorf("model is not empty, type cannot be modified"))
 	}
 	mdl.typ = typ
 	return nil

@@ -1,12 +1,12 @@
 package model
 
 import (
-	"github.com/bdlm/errors"
-	"github.com/bdlm/std"
+	"github.com/bdlm/errors/v2"
+	stdModel "github.com/bdlm/std/v2/model"
 )
 
 /*
-Cur implements std.Iterator.
+Cur implements stdModel.Iterator.
 
 Cur reads the key and value at the current cursor postion into pK and pV
 respectively. Cur will return false if no iteration has begun, including
@@ -18,7 +18,7 @@ func (mdl *Model) Cur(pK, pV *interface{}) bool {
 	}
 
 	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.GetType() {
+	if stdModel.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
 	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
@@ -31,7 +31,7 @@ func (mdl *Model) Cur(pK, pV *interface{}) bool {
 }
 
 /*
-Next implements std.Iterator.
+Next implements stdModel.Iterator.
 
 Next moves the cursor forward one position before reading the key and value
 at the cursor position into pK and pV respectively. If data is available at
@@ -51,7 +51,7 @@ func (mdl *Model) Next(pK, pV *interface{}) bool {
 	}
 
 	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.GetType() {
+	if stdModel.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
 	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
@@ -65,7 +65,7 @@ func (mdl *Model) Next(pK, pV *interface{}) bool {
 }
 
 /*
-Prev implements std.Iterator.
+Prev implements stdModel.Iterator.
 
 Prev moves the cursor backward one position before reading the key and value
 at the cursor position into pK and pV respectively. If data is available at
@@ -83,7 +83,7 @@ func (mdl *Model) Prev(pK, pV *interface{}) bool {
 	}
 
 	*pK = mdl.pos
-	if std.ModelTypeHash == mdl.GetType() {
+	if stdModel.ModelTypeHash == mdl.GetType() {
 		*pK = mdl.idxHash[mdl.pos]
 	}
 	if tmp, ok := mdl.data[mdl.pos].(*Value); ok && nil != tmp {
@@ -97,7 +97,7 @@ func (mdl *Model) Prev(pK, pV *interface{}) bool {
 }
 
 /*
-Reset implements std.Iterator.
+Reset implements stdModel.Iterator.
 
 Reset sets the iterator cursor position.
 */
@@ -106,18 +106,18 @@ func (mdl *Model) Reset() {
 }
 
 /*
-Seek implements std.Iterator.
+Seek implements stdModel.Iterator.
 
 Seek sets the iterator cursor position.
 */
 func (mdl *Model) Seek(pos interface{}) error {
 	// List model
-	if std.ModelTypeList == mdl.GetType() {
+	if stdModel.ModelTypeList == mdl.GetType() {
 		idx := pos.(int)
 		if idx >= len(mdl.data) {
-			return errors.New(InvalidIndex, "the specified position '%d' is beyond the end of the data", idx)
+			return errors.WrapE(InvalidIndex, errors.Errorf("the specified position '%d' is beyond the end of the data", idx))
 		} else if idx < 0 {
-			return errors.New(InvalidIndex, "invalid index '%d'", idx)
+			return errors.WrapE(InvalidIndex, errors.Errorf("invalid index '%d'", idx))
 		}
 		mdl.pos = idx - 1
 		return nil
@@ -128,5 +128,5 @@ func (mdl *Model) Seek(pos interface{}) error {
 	if idx, ok := mdl.hashIdx[hashKey]; ok {
 		mdl.pos = idx - 1
 	}
-	return errors.New(InvalidIndex, "the specified position '%s' does not exist", hashKey)
+	return errors.WrapE(InvalidIndex, errors.Errorf("the specified position '%s' does not exist", hashKey))
 }
