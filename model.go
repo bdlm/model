@@ -207,7 +207,6 @@ func (mdl *Model) Reduce(callback func(stdModel.Value) bool) stdModel.Value {
 Reverse reverses the order of the data store.
 */
 func (mdl *Model) Reverse() {
-	return
 }
 
 /*
