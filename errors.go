@@ -5,9 +5,7 @@ import (
 	stdErrors "github.com/bdlm/std/v2/errors"
 )
 
-/*
-Internal errors
-*/
+// Internal errors
 var (
 	// InvalidIndex - The specified index does not exist.
 	InvalidIndex stdErrors.Error
@@ -26,6 +24,11 @@ var (
 	// InvalidDataSet - An attempt was made to store a data set that is
 	// with the model type
 	InvalidDataSet stdErrors.Error
+
+	// InvalidSortFlagCombination - The specified sort flag combination is
+	// invalid for this model type or in conflict with another flag.
+	// E.g. SortByKey and SortByValue.
+	InvalidSortFlagCombination stdErrors.Error
 )
 
 func init() {
@@ -33,4 +36,6 @@ func init() {
 	InvalidIndexType = errors.New("an invalid index datatype was used")
 	InvalidMethodContext = errors.New("a method was used in an invalid context")
 	ReadOnlyProperty = errors.New("cannot update a read-only property")
+	InvalidDataSet = errors.New("invalid data set for model type")
+	InvalidSortFlagCombination = errors.New("invalid sort flag combination")
 }

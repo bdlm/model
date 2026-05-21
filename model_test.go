@@ -38,7 +38,7 @@ func TestNewHash(t *testing.T) {
 	//str, err2 := val.String()
 	//t.Errorf("%v - %v (%v)", str, err2, err)
 
-	//for mdl.(std.Iterator).Next(func(k interface{}, v std.Value) {
+	//for mdl.(std.Iterator).Next(func(k any, v std.Value) {
 	//	t.Errorf("key: %v; val: %v;", k, v.Value())
 	//}) {
 	//}
@@ -50,7 +50,7 @@ func TestHashIterator(t *testing.T) {
 	//	mdl.Set("key1", "val1")
 	//	mdl.Set("key2", "val2")
 	//
-	//	var key, val interface{}
+	//	var key, val any
 	//	for mdl.(std.Iterator).Next(&key, &val) {
 	//		t.Errorf("key: %v; val: %v;", key, val)
 	//	}
@@ -58,7 +58,7 @@ func TestHashIterator(t *testing.T) {
 }
 
 func TestModelType(t *testing.T) {
-	mdl := model.New(stdModel.ModelTypeHash)
+	mdl := model.New(stdModel.ModelTypeHash, nil)
 
 	// Push is only valid for std.ModelTypeList model types
 	err := mdl.Push("val1")
@@ -67,7 +67,7 @@ func TestModelType(t *testing.T) {
 	}
 	if e, ok := err.(stdError.Error); !ok {
 		t.Errorf("expected errors.Err, received '%v'", err)
-	} else if model.InvalidMethodContext.Is(e) {
+	} else if !model.InvalidMethodContext.Is(e) {
 		t.Errorf("expected model.InvalidMethodContext, received '%v'", e)
 	}
 
@@ -80,7 +80,7 @@ func TestModelType(t *testing.T) {
 	mdl.Set(integer, "10")
 	mdl.Set(float, "1234567890.0000000000") // 10-digit precision...
 	mdl.Set(err, "err-key")
-	var key, val interface{}
+	var key, val any
 	for mdl.Next(&key, &val) {
 		v, err := val.(stdModel.Value).String()
 		if nil != err {

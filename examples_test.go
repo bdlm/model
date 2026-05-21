@@ -12,19 +12,19 @@ import (
 )
 
 func ExampleNew() {
-	mdl := model.New(stdModel.ModelTypeHash)
+	mdl := model.New(stdModel.ModelTypeHash, nil)
 	json.Unmarshal(
 		[]byte(`{"key1":"value1","key2":2,"key3":["one","two","three"],"key4":{"k1":"v1","k2":"v2"}}`),
 		&mdl,
 	)
-	var key, val interface{}
+	var key, val any
 	for mdl.Next(&key, &val) {
 		if "key3" == key.(string) || "key4" == key.(string) {
-			var k2, v2 interface{}
+			var k2, v2 any
 			var m2 stdModel.Model
 			m2, _ = val.(stdModel.Value).Model()
 			if nil == m2 {
-				data, hash, index := mdl.Data()
+				data, hash, index := mdl.GetData()
 				log.Debugf("\n\n\ndata: %v\nhash: %v\nindex: %v\n\n\n", data, hash, index)
 				os.Exit(1)
 			}

@@ -7,45 +7,42 @@ import (
 	stdModel "github.com/bdlm/std/v2/model"
 )
 
-/*
-MarshalJSON implements json.Marshaler.
-*/
+// MarshalJSON implements json.Marshaler.
 func (mdl *Model) MarshalJSON() ([]byte, error) {
+	mdl.mux.Lock()
+	defer mdl.mux.Unlock()
 	if stdModel.ModelTypeList == mdl.GetType() {
 		return json.Marshal(mdl.data)
 	}
-	d := map[string]interface{}{}
+	d := map[string]any{}
 	for k, v := range mdl.data {
 		d[mdl.idxHash[k]] = v
 	}
 	return json.Marshal(d)
 }
 
-/*
-MarshalModel implements Marshaler.
-*/
+// MarshalModel implements Marshaler.
 func (mdl *Model) MarshalModel() ([]byte, error) {
 	return mdl.MarshalJSON()
 }
 
-/*
-UnmarshalJSON implements json.Unmarshaler.
-*/
+// UnmarshalJSON implements json.Unmarshaler.
 func (mdl *Model) UnmarshalJSON(jsn []byte) error {
-	var data interface{}
+	var data any
 
-	err := json.Unmarshal(jsn, &data)
-	if nil != err {
+	if err := json.Unmarshal(jsn, &data); err != nil {
 		return errors.Wrap(err, "unmarshaling failed")
 	}
-	mdl.importData(data)
-
+	if _, err := mdl.importData(data); err != nil {
+		return errors.Wrap(err, "import failed")
+	}
 	return nil
 }
 
-/*
-UnmarshalModel implements Marshaler.
-*/
-func (mdl *Model) UnmarshalModel() ([]byte, error) {
-	return mdl.MarshalJSON()
+// UnmarshalModel implements Unmarshaler.
+func (mdl *Model) UnmarshalModel(bytes []byte) error {
+	if string(bytes) == "null" {
+		return nil
+	}
+	return mdl.UnmarshalJSON(bytes)
 }
