@@ -4,28 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/bdlm/log/v2"
 	"github.com/bdlm/model"
 	stdModel "github.com/bdlm/std/v2/model"
 	stdSorter "github.com/bdlm/std/v2/sorter"
 )
-
-func init() {
-	level, _ := log.ParseLevel("debug")
-	if os.Getenv("SERVER_ENV") == "dev" {
-		log.SetFormatter(&log.TextFormatter{ForceTTY: true, EnableTrace: false})
-	} else {
-		log.SetFormatter(&log.JSONFormatter{FieldMap: log.FieldMap{"data": "_"}})
-	}
-	log.SetLevel(level)
-}
 
 // helpers
 
@@ -560,6 +548,38 @@ func TestSetDataHash(t *testing.T) {
 	}
 	if !m.Has("new") {
 		t.Error("'new' key should exist after SetData")
+	}
+}
+
+// TestSetDataHashSortedOrder verifies that SetData on a HASH model inserts keys
+// in ascending alphabetical order, matching the behaviour of importMap and
+// UnmarshalJSON.
+func TestSetDataHashSortedOrder(t *testing.T) {
+	m := mustNew(t, model.HASH, nil)
+	if err := m.SetData(map[string]any{"c": 3, "a": 1, "b": 2}); err != nil {
+		t.Fatalf("SetData: %v", err)
+	}
+	want := []string{"a", "b", "c"}
+	for i, wantKey := range want {
+		v, err := m.Get(wantKey)
+		if err != nil {
+			t.Fatalf("Get(%q): %v", wantKey, err)
+		}
+		n, _ := v.Int()
+		if n != i+1 {
+			t.Errorf("key %q: want value %d, got %d", wantKey, i+1, n)
+		}
+	}
+	// Iterate to confirm key order.
+	var gotKeys []string
+	var k, v any
+	for m.Next(&k, &v) {
+		gotKeys = append(gotKeys, k.(string))
+	}
+	for i, k := range gotKeys {
+		if k != want[i] {
+			t.Errorf("iteration position %d: want key %q, got %q", i, want[i], k)
+		}
 	}
 }
 
@@ -1399,6 +1419,23 @@ func TestMarshalModel(t *testing.T) {
 	}
 }
 
+// TestModelStringErrorFallback verifies that Model.String() returns the error
+// message when MarshalJSON fails (e.g., when the model contains a value that
+// encoding/json cannot serialize, such as a channel).
+func TestModelStringErrorFallback(t *testing.T) {
+	m := mustNew(t, model.HASH, nil)
+	// Channels are not JSON-serializable; this causes MarshalJSON to return an error.
+	m.Set("bad", make(chan int))
+	s := m.String()
+	if s == "" {
+		t.Fatal("String() returned empty string; expected an error message")
+	}
+	// The string must not be valid JSON — it should be an error message, not "{}".
+	if s == "{}" || s[0] == '{' {
+		t.Errorf("String() returned JSON-like output %q; expected error message", s)
+	}
+}
+
 func TestUnmarshalModel(t *testing.T) {
 	m := mustNew(t, model.HASH, nil)
 	m.Set("x", 99)
@@ -2183,6 +2220,205 @@ func TestMergeLockDuringRecursiveUnlockWindow(t *testing.T) {
 	// Confirm "extra" was not written.
 	if base.Has("extra") {
 		t.Error("Merge wrote 'extra' to a locked model")
+	}
+}
+
+// TestSortByValueModelBucket verifies that stratifiedLess correctly sorts nested
+// *Model values in a LIST using the model bucket (bucket 0). Models are compared
+// by GetID() string and then by element count as a tiebreaker.
+func TestSortByValueModelBucket(t *testing.T) {
+	// Build three child models with distinct IDs.
+	mC, _ := model.New(model.HASH, nil)
+	mC.SetID("c")
+	mC.Set("x", 1)
+
+	mA, _ := model.New(model.HASH, nil)
+	mA.SetID("a")
+	mA.Set("x", 1)
+	mA.Set("y", 2)
+
+	mB, _ := model.New(model.HASH, nil)
+	mB.SetID("b")
+
+	// Insert in reverse-alphabetical order: c, a, b.
+	parent := mustNew(t, model.LIST, nil)
+	parent.Push(mC)
+	parent.Push(mA)
+	parent.Push(mB)
+
+	if err := parent.Sort(stdSorter.SortAsc); err != nil {
+		t.Fatalf("Sort: %v", err)
+	}
+
+	// After ascending sort the order should be: mA ("a") < mB ("b") < mC ("c").
+	for i, wantID := range []string{"a", "b", "c"} {
+		v, err := parent.Get(i)
+		if err != nil {
+			t.Fatalf("Get(%d): %v", i, err)
+		}
+		mdl, err := v.Model()
+		if err != nil {
+			t.Fatalf("Model() at index %d: %v", i, err)
+		}
+		gotID := fmt.Sprintf("%v", mdl.GetID())
+		if gotID != wantID {
+			t.Errorf("index %d: want ID %q, got %q", i, wantID, gotID)
+		}
+	}
+}
+
+// TestSortByValueModelTiebreakByLen verifies that when two *Model values share
+// the same GetID, the shorter model sorts before the longer one (modelLen tiebreak).
+func TestSortByValueModelTiebreakByLen(t *testing.T) {
+	mFew, _ := model.New(model.HASH, nil)
+	mFew.SetID("same")
+	mFew.Set("a", 1)
+
+	mMany, _ := model.New(model.HASH, nil)
+	mMany.SetID("same")
+	mMany.Set("a", 1)
+	mMany.Set("b", 2)
+	mMany.Set("c", 3)
+
+	parent := mustNew(t, model.LIST, nil)
+	parent.Push(mMany)
+	parent.Push(mFew)
+
+	if err := parent.Sort(stdSorter.SortAsc); err != nil {
+		t.Fatalf("Sort: %v", err)
+	}
+
+	v0, _ := parent.Get(0)
+	m0, _ := v0.Model()
+	data0, _, _ := m0.GetData()
+	if len(data0) != 1 {
+		t.Errorf("expected shorter model (len 1) at index 0, got len %d", len(data0))
+	}
+}
+
+// TestImportNestedSliceInSlice verifies that importSlice correctly handles
+// arrays-of-arrays by creating nested LIST child models.
+func TestImportNestedSliceInSlice(t *testing.T) {
+	jsn := []byte(`[[1,2],[3,4]]`)
+	m, err := model.New(model.LIST, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := m.UnmarshalJSON(jsn); err != nil {
+		t.Fatalf("UnmarshalJSON: %v", err)
+	}
+	if m.Len() != 2 {
+		t.Fatalf("expected 2 child models, got %d", m.Len())
+	}
+	// Each child should be a LIST model containing 2 numeric elements.
+	for i := 0; i < 2; i++ {
+		v, err := m.Get(i)
+		if err != nil {
+			t.Fatalf("Get(%d): %v", i, err)
+		}
+		child, err := v.Model()
+		if err != nil {
+			t.Fatalf("Model() at index %d: %v", i, err)
+		}
+		childData, _, _ := child.GetData()
+		if len(childData) != 2 {
+			t.Errorf("child[%d]: expected len 2, got %d", i, len(childData))
+		}
+	}
+	// Verify specific values: child[0][0]==1, child[0][1]==2, child[1][0]==3, child[1][1]==4.
+	expected := [][]float64{{1, 2}, {3, 4}}
+	for i, row := range expected {
+		cv, _ := m.Get(i)
+		child, _ := cv.Model()
+		for j, want := range row {
+			ev, err := child.Get(j)
+			if err != nil {
+				t.Fatalf("child[%d].Get(%d): %v", i, j, err)
+			}
+			got, err := ev.Float64()
+			if err != nil {
+				t.Fatalf("child[%d][%d] Float64: %v", i, j, err)
+			}
+			if got != want {
+				t.Errorf("child[%d][%d]: want %v, got %v", i, j, want, got)
+			}
+		}
+	}
+}
+
+// ── Benchmarks ─────────────────────────────────────────────────────────────────
+
+// BenchmarkSortByKeyHash measures Sort(SortByKey) on a HASH model with 100 entries.
+func BenchmarkSortByKeyHash(b *testing.B) {
+	m, _ := model.New(model.HASH, nil)
+	for i := 0; i < 100; i++ {
+		m.Set(fmt.Sprintf("key%03d", i), i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Sort(stdSorter.SortByKey)
+	}
+}
+
+// BenchmarkSortByValueList measures Sort(SortAsc) on a LIST model with 100 numeric elements.
+func BenchmarkSortByValueList(b *testing.B) {
+	m, _ := model.New(model.LIST, nil)
+	for i := 99; i >= 0; i-- {
+		m.Push(i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Sort(stdSorter.SortAsc)
+	}
+}
+
+// BenchmarkMergeHash measures merging two 50-key HASH models.
+func BenchmarkMergeHash(b *testing.B) {
+	base, _ := model.New(model.HASH, nil)
+	for i := 0; i < 50; i++ {
+		base.Set(fmt.Sprintf("base%03d", i), i)
+	}
+	inc, _ := model.New(model.HASH, nil)
+	for i := 0; i < 50; i++ {
+		inc.Set(fmt.Sprintf("inc%03d", i), i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		clone, _ := model.New(model.HASH, nil)
+		var k, v any
+		base.Reset()
+		for base.Next(&k, &v) {
+			clone.Set(k.(string), v)
+		}
+		clone.Merge(inc)
+	}
+}
+
+// BenchmarkMergeDeepHash measures merging nested HASH models two levels deep.
+func BenchmarkMergeDeepHash(b *testing.B) {
+	makeNested := func(prefix string, depth, width int) *model.Model {
+		root, _ := model.New(model.HASH, nil)
+		for i := 0; i < width; i++ {
+			child, _ := model.New(model.HASH, nil)
+			for j := 0; j < width; j++ {
+				child.Set(fmt.Sprintf("%s_c%d_k%d", prefix, i, j), j)
+			}
+			root.Set(fmt.Sprintf("%s_k%d", prefix, i), child)
+		}
+		_ = depth
+		return root
+	}
+	base := makeNested("base", 2, 5)
+	inc := makeNested("inc", 2, 5)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		clone, _ := model.New(model.HASH, nil)
+		var k, v any
+		base.Reset()
+		for base.Next(&k, &v) {
+			clone.Set(k.(string), v)
+		}
+		clone.Merge(inc)
 	}
 }
 

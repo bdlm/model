@@ -1,6 +1,5 @@
 /vendor
 vendor/
-go.sum
 go.work
 go.work.sum
 benchmark*

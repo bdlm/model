@@ -8,8 +8,7 @@ type Marshaler interface {
 
 // Unmarshaler is the interface implemented by Models that can unmarshal a
 // serialized description of themselves. The input can be assumed to be a valid
-// encoding of a Model value. UnmarshalModel must copy the data if it wishes to
-// retain the data after returning.
+// encoding of a Model value.
 //
 // By convention, to approximate the behavior of similar functionality in other
 // packages, Unmarshalers implement UnmarshalModel([]byte("null")) as a no-op.

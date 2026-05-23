@@ -271,13 +271,12 @@ func ExampleModel_SetData() {
 }
 
 // ExampleModel_SetData_hash demonstrates replacing all data in a HASH model.
-// The map iteration order is non-deterministic, so Sort is called to ensure
-// a consistent result.
+// Keys are stored in ascending alphabetical order, matching the behaviour of
+// New and UnmarshalJSON.
 func ExampleModel_SetData_hash() {
 	m, _ := model.New(model.HASH, nil)
 	m.Set("old", 99)
 	m.SetData(map[string]any{"a": 1, "b": 2})
-	m.Sort(sorter.SortByKey) // normalize order
 	var k, v any
 	for m.Next(&k, &v) {
 		n, _ := v.(stdModel.Value).Int()

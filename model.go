@@ -1,6 +1,7 @@
 package model
 
 import (
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -639,9 +640,9 @@ func (mdl *Model) SetID(id any) error {
 // subsequent mutations to the original slice do not affect the model.
 //
 // For HASH models, data must be map[string]any. The key-value pairs are
-// inserted into a fresh data store. Because Go map iteration order is
-// non-deterministic, call [Model.Sort] afterward if a specific element order
-// is required. Values are stored without wrapping in *[Value]; they are wrapped
+// inserted into a fresh data store in ascending alphabetical key order,
+// matching the deterministic ordering applied by [Model.UnmarshalJSON] and
+// [importMap]. Values are stored without wrapping in *[Value]; they are wrapped
 // transparently on retrieval by [Model.Get] and the iterator methods.
 //
 // A successful SetData resets the cursor to -1. A failed call (wrong type for
@@ -673,14 +674,20 @@ func (mdl *Model) SetData(data any) error {
 		return errors.WrapE(InvalidDataSet, errors.Errorf("invalid data set for hash model"))
 	}
 
+	keys := make([]string, 0, len(d))
+	for k := range d {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	mdl.pos = -1 // successful mutation invalidates cursor
-	mdl.data = []any{}
-	mdl.hashIdx = map[string]int{}
-	mdl.idxHash = map[int]string{}
-	for k, v := range d {
+	mdl.data = make([]any, 0, len(d))
+	mdl.hashIdx = make(map[string]int, len(d))
+	mdl.idxHash = make(map[int]string, len(d))
+	for _, k := range keys {
 		mdl.hashIdx[k] = len(mdl.data)
 		mdl.idxHash[len(mdl.data)] = k
-		mdl.data = append(mdl.data, v)
+		mdl.data = append(mdl.data, d[k])
 	}
 	return nil
 }
