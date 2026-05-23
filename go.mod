@@ -6,7 +6,7 @@ require (
 	github.com/bdlm/cast/v2 v2.1.4
 	github.com/bdlm/errors/v2 v2.1.2
 	github.com/bdlm/log/v2 v2.0.7
-	github.com/bdlm/std/v2 v2.1.0
+	github.com/bdlm/std/v2 v2.1.1-rc3
 )
 
 require (

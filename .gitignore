@@ -1,11 +1,10 @@
 /vendor
-_*
-go.sum
+vendor/
 go.sum
 go.work
-vendor/
-_*
+go.work.sum
 benchmark*
+_*
 .claude*
 claude*
 CLAUDE*
