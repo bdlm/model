@@ -14,6 +14,8 @@
     <a href="https://github.com/bdlm/model/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
 </p>
 
+<a href="https://github.com/mkenney/software-guides/blob/master/STABILITY-BADGES.md#release-candidate"><img src="https://img.shields.io/badge/stability-pre--release-48c9b0.svg" alt="Release Candidate"></a> Code is fairly settled and is in use in production systems. Backwards-compatibility will be mintained unless serious issues are discovered and a better solution is reached.
+
 `bdlm/model` is a generic, type-agnostic data container for Go. A single `Model` can hold either a **hash** (string-keyed map) or a **list** (integer-indexed array) of arbitrary values, with full support for nested models, bidirectional cursor iteration, sorting, merging, functional transforms, and JSON marshaling.
 
 All public methods are safe for concurrent use.
