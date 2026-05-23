@@ -11,7 +11,7 @@
     <a href="https://goreportcard.com/report/github.com/bdlm/model"><img src="https://goreportcard.com/badge/github.com/bdlm/model" alt="Go Report Card"></a>
     <a href="https://github.com/bdlm/model/issues"><img src="https://img.shields.io/github/issues-raw/bdlm/model.svg" alt="Github issues"></a>
     <a href="https://github.com/bdlm/model/pulls"><img src="https://img.shields.io/github/issues-pr/bdlm/model.svg" alt="Github pull requests"></a>
-    <a href="https://github.com/bdlm/model/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
+    <a href="https://github.com/bdlm/model/blob/main/LICENSE"><img src="https://img.shields.io/github/license/bdlm/model" alt="MIT"></a>
 </p>
 
 <a href="https://github.com/mkenney/software-guides/blob/master/STABILITY-BADGES.md#release-candidate"><img src="https://img.shields.io/badge/stability-pre--release-48c9b0.svg" alt="Release Candidate"></a> Code is fairly settled and is in use in production systems. Backwards-compatibility will be maintained unless serious issues are discovered and a better solution is reached.
