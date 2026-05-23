@@ -1,3 +1,10 @@
 /vendor
+vendor/
+go.work
+go.work.sum
+benchmark*
 _*
-go.sum
+.claude*
+claude*
+CLAUDE*
+coverage*
