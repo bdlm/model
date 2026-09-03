@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/bdlm/cast/v2 v2.1.4
-	github.com/bdlm/errors/v2 v2.1.2
+	github.com/bdlm/errors/v2 v2.2.1
 	github.com/bdlm/std/v2 v2.2.0
 )
 
